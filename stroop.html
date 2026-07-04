@@ -205,7 +205,7 @@ function makeTimedBlock(stimuli, practice, timeLimit, trialType) { // trialType 
             }
             return 'フィードバックエラー';
           },
-          choices: jsPsych.NO_KEYS,
+          choices: "NO_KEYS",
           trial_duration: 1000,
           on_finish: function() {
             if (performance.now() - blockStart >= timeLimit) {
