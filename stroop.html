@@ -1,0 +1,283 @@
+<!doctype html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet">
+  <script src="https://unpkg.com/jspsych@7.3.4"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-fullscreen@1.2.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.2.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.0"></script>
+  <script src="https://unpkg.com/@jspsych-contrib/plugin-pipe@0.4"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-survey-html-form@1.0.3"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-call-function@1.1.3"></script>
+</head>
+<body></body>
+<script>
+
+const jsPsych = initJsPsych();
+
+const expID = "UfeYRYgvQLaV";
+const participantID = jsPsych.randomization.randomID(12);
+const filename = `stroop_${participantID}.csv`;
+
+jsPsych.data.addProperties({
+  participant_id: participantID,
+  study: "stroop_reverse_stroop"
+});
+
+/**
+ * Stroop & Reverse Stroop Experiment (case4 fixed)
+ * Control blocks by total time: practice 10s, main 40s
+ */
+
+// Configuration
+const PRACTICE_TIME   = 10000;  // 練習ブロック全体：10秒
+const MAIN_TRIAL_TIME = 40000;  // 本試行ブロック全体：40秒
+
+// Color-word mapping
+const colorInfo = [
+  { str: 'あか', col: 'red' },
+  { str: 'あお', col: 'blue' },
+  { str: 'きいろ', col: '#ffd900' },
+  { str: 'みどり', col: 'forestgreen' },
+  { str: 'くろ', col: 'black' }
+];
+
+// Build stimulus sets
+function makeSets() {
+  const stroop = [];          // 通常ストループ試行用配列
+  const control = [];         // 通常コントロール試行用配列
+  const newRevStroop = [];    // 新しい逆ストループ試行用配列（全組み合わせ）
+  const revControl = [];      // 逆コントロール試行用配列
+
+  colorInfo.forEach((wordDef, wordIdx) => {
+    // wordDef: { str: '単語文字列', col: '単語の本来の色' }, wordIdx: 単語のインデックス
+
+    // コントロール試行: XXX の文字色を答える (正解は wordDef の色 = wordIdx)
+    control.push({
+      stimulus: `<p style="color:${wordDef.col}; font-size:30px;">XXX</p>`,
+      correctIndex: wordIdx
+    });
+
+    // 逆コントロール試行: 黒文字で書かれた単語を読む (正解は wordDef の単語 = wordIdx)
+    revControl.push({
+      stimulus: `<p style="color:black; font-size:30px;">${wordDef.str}</p>`,
+      correctIndex: wordIdx
+    });
+
+    // 新しい逆ストループ試行の生成 (すべての単語と色の組み合わせ)
+    // 課題: 表示された単語を読む (正解は wordDef の単語 = wordIdx)
+    colorInfo.forEach((inkDef, inkIdx) => {
+      if (wordIdx !== inkIdx) {
+        newRevStroop.push({
+          stimulus: `<p style="color:${inkDef.col}; font-size:30px;">${wordDef.str}</p>`,
+          correctIndex: wordIdx
+        });
+      }
+    });
+
+    // 通常ストループ試行の生成 (不一致試行のみ)
+    // 課題: 文字色を答える
+    colorInfo.forEach((inkDefForStroop, inkStroopIdx) => {
+      // inkDefForStroop: { str: 'インク色の元単語', col: 'インクの色' }, inkStroopIdx: インク色のインデックス
+      if (wordIdx !== inkStroopIdx) { // 単語の本来の色と文字色が異なる場合 (不一致)
+        stroop.push({
+          stimulus: `<p style="color:${inkDefForStroop.col}; font-size:30px;">${wordDef.str}</p>`, // 単語は wordDef.str, 文字色は inkDefForStroop.col
+          correctIndex: inkStroopIdx // 正解は文字色 (inkDefForStroop.col) のインデックス
+        });
+      }
+    });
+  });
+
+  return { stroop, control, revStroop: newRevStroop, revControl };
+}
+const { stroop, control, revStroop, revControl } = makeSets(); // この呼び出しは変更なし
+
+// Participant info form
+const timeline = [];
+timeline.push({
+  type: jsPsychSurveyHtmlForm,
+  preamble: '<h2>これから実験を開始します: 性別と年齢を入力してください</h2>',
+  html: `
+    <input type="radio" name="gender" value="1" required>男性
+    <input type="radio" name="gender" value="2">女性
+    <input type="radio" name="gender" value="3">その他
+    <div></div>
+    <select name="age" required>
+      <option value="">選択</option>
+      ${Array.from({length:71},(_,i)=>`<option value="${i+10}">${i+10}歳</option>`).join('')}
+    </select>
+  `,
+  button_label: '次へ'
+});
+
+// Timed block using timeline_variables
+function makeTimedBlock(stimuli, practice, timeLimit, trialType) { // trialType 引数はそのまま
+  let blockStart;
+  let currentShuffledColorInfoForChoices = [];
+
+  return [
+    {
+      type: jsPsychCallFunction,
+      func: () => {
+        blockStart = performance.now();
+      }
+    },
+    {
+      timeline: [
+        {
+          type: jsPsychHtmlButtonResponse,
+          stimulus: jsPsych.timelineVariable('stimulus'),
+          choices: function() {
+            const shuffledColorInfo = jsPsych.randomization.shuffle([...colorInfo]);
+            currentShuffledColorInfoForChoices = [...shuffledColorInfo];
+
+            // ★★★ on_loadでの分岐条件に合わせて、trialTypeではなく、
+            // dataオブジェクトに保存するキー名（今回は 'condition'）で判断する方が
+            // 内部的な一貫性が高まりますが、ここでは trialType を直接使います。
+            // もし data.condition で分岐したい場合は、choices関数がdataオブジェクトに
+            // アクセスできないため、trialType をそのまま使います。
+            if (trialType === 'revControl' || trialType === 'revStroop') {
+              return currentShuffledColorInfoForChoices.map(ci =>
+                `<div class="color-choice-cell" style="background-color: ${ci.col}; width: 60px; height: 60px; border: 2px solid #ccc; display: inline-block; margin: 5px; cursor: pointer;"></div>`
+              );
+            } else {
+              return currentShuffledColorInfoForChoices.map(ci => ci.str);
+            }
+          },
+          button_html: function() {
+            // ★★★ こちらも trialType を使って分岐 ★★★
+            if (trialType === 'revControl' || trialType === 'revStroop') {
+              return `<button class="jspsych-html-button-response-button custom-choice-button color-cell-button-wrapper">%choice%</button>`;
+            } else if (trialType === 'control' || trialType === 'stroop') {
+              return `<button class="jspsych-html-button-response-button custom-choice-button">%choice%</button>`;
+            }
+            return '<button class="jspsych-html-button-response-button">%choice%</button>';
+          },
+          trial_duration: function() {
+            const remaining = timeLimit - (performance.now() - blockStart);
+            return Math.max(0, remaining);
+          },
+          data: function() {
+            const originalCorrectIndexFromStimulus = jsPsych.timelineVariable('correctIndex');
+            return {
+              original_correct_index: originalCorrectIndexFromStimulus,
+              // ★★★ キー名を block_type から condition に変更 ★★★
+              condition: trialType,
+              is_practice: practice,
+            };
+          },        
+          on_finish: function(data) {
+            const originalCorrectColorObject = colorInfo[data.original_correct_index];
+
+            let shuffledCorrectIndex;
+          },
+  if (data.condition === 'revControl' || data.condition === 'revStroop') {
+    shuffledCorrectIndex = currentShuffledColorInfoForChoices.findIndex(
+      ci => ci.col.toLowerCase() === originalCorrectColorObject.col.toLowerCase()
+    );
+  } else {
+    shuffledCorrectIndex = currentShuffledColorInfoForChoices.findIndex(
+      ci => ci.str === originalCorrectColorObject.str
+    );
+  }
+
+  data.shuffled_correct_index = shuffledCorrectIndex;
+  data.presented_choices_info = JSON.stringify(currentShuffledColorInfoForChoices);
+
+  if (typeof data.response !== 'undefined' && data.response !== null) {
+    data.correct = Number(data.response) === shuffledCorrectIndex ? 1 : 0;
+  } else {
+    data.correct = 0;
+  }
+
+  if (performance.now() - blockStart >= timeLimit) {
+    jsPsych.endCurrentTimeline();
+  }
+}
+        },
+        ...(practice ? [{
+          type: jsPsychHtmlKeyboardResponse,
+          stimulus: function() {
+            const lastTrialData = jsPsych.data.getLastTrialData().values()[0];
+            if (lastTrialData && typeof lastTrialData.correct !== 'undefined') {
+              return lastTrialData.correct ? '正解' : '誤答';
+            }
+            return 'フィードバックエラー';
+          },
+          choices: jsPsych.NO_KEYS,
+          trial_duration: 1000,
+          on_finish: function() {
+            if (performance.now() - blockStart >= timeLimit) {
+              jsPsych.endCurrentTimeline();
+            }
+          }
+        }] : [])
+      ],
+      timeline_variables: stimuli,
+      randomize_order: true,
+      loop_function: () => performance.now() - blockStart < timeLimit
+    }
+  ];
+}
+
+// Instructions
+const instructions = {
+  revControl: '<p>今から，色を表す単語が表示されます。</p><p>その単語の意味と合致する色を，選択肢の中から選んでください。</p><p>回答は，できるだけ早く，正確に行ってください。</p><p>練習全体10秒</p>',
+  revStroop:  '<p>今から，色を表す単語が表示されます。</p><p>先ほどと同様に，その単語の意味と合致する色を，選択肢の中から選んでください。</p><p>回答は，できるだけ早く，正確に行ってください。</p><p>練習全体10秒</p>',
+  control:    '<p>今から，XXXという文字列が表示されます。</p><p>その文字列の色と合致する選択肢を選んでください。</p><p>回答は，できるだけ早く，正確に行ってください。</p><p>練習全体10秒</p>',
+  stroop:     '<p>今から，色を表す単語の文字列が表示されます。</p><p>先ほどと同様に，その文字列の色と合致する選択肢を選んでください。</p><p>回答は，できるだけ早く，正確に行ってください。</p><p>練習全体10秒</p>',
+  startMain:  '<p>本試行開始: 最大40秒</p>'
+};
+
+// Experiment flow
+// 1. Reverse Control
+timeline.push({ type: jsPsychHtmlButtonResponse, stimulus: instructions.revControl, choices: ['次へ'] });
+timeline.push(...makeTimedBlock(revControl, true, PRACTICE_TIME, 'revControl'));
+timeline.push({ type: jsPsychHtmlButtonResponse, stimulus: instructions.startMain, choices: ['次へ'] });
+timeline.push(...makeTimedBlock(revControl, false, MAIN_TRIAL_TIME, 'revControl'));
+
+// 2. Reverse Stroop
+timeline.push({ type: jsPsychHtmlButtonResponse, stimulus: instructions.revStroop, choices: ['次へ'] });
+timeline.push(...makeTimedBlock(revStroop, true, PRACTICE_TIME, 'revStroop'));
+timeline.push({ type: jsPsychHtmlButtonResponse, stimulus: instructions.startMain, choices: ['次へ'] });
+timeline.push(...makeTimedBlock(revStroop, false, MAIN_TRIAL_TIME, 'revStroop'));
+
+// 3. Control
+timeline.push({ type: jsPsychHtmlButtonResponse, stimulus: instructions.control, choices: ['次へ'] });
+timeline.push(...makeTimedBlock(control, true, PRACTICE_TIME, 'control'));
+timeline.push({ type: jsPsychHtmlButtonResponse, stimulus: instructions.startMain, choices: ['次へ'] });
+timeline.push(...makeTimedBlock(control, false, MAIN_TRIAL_TIME, 'control'));
+
+// 4. Stroop
+timeline.push({ type: jsPsychHtmlButtonResponse, stimulus: instructions.stroop, choices: ['次へ'] });
+timeline.push(...makeTimedBlock(stroop, true, PRACTICE_TIME, 'stroop'));
+timeline.push({ type: jsPsychHtmlButtonResponse, stimulus: instructions.startMain, choices: ['次へ'] });
+timeline.push(...makeTimedBlock(stroop, false, MAIN_TRIAL_TIME, 'stroop'));
+
+// End
+timeline.push({
+  type: jsPsychHtmlButtonResponse,
+  stimulus: '<p>実験は終了です。おつかれさまでした。</p><p>「送信」を押すと，データを送信します。送信が完了するまで画面を閉じないでください。</p>',
+  choices: ['送信']
+});
+
+timeline.push({
+  type: jsPsychPipe,
+  action: "save",
+  experiment_id: expID,
+  filename: filename,
+  data_string: () => jsPsych.data.get().csv(),
+  wait_message: "<p>データを送信しています。画面を閉じないでください。</p>"
+});
+
+timeline.push({
+  type: jsPsychHtmlButtonResponse,
+  stimulus: '<p>データの送信が完了しました。ご協力ありがとうございました。</p><p>この画面を閉じてください。</p>',
+  choices: []
+});
+
+// Initialize and start
+jsPsych.run(timeline);
+</script>
+</html>
