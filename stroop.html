@@ -171,16 +171,17 @@ function makeTimedBlock(stimuli, practice, timeLimit, trialType) { // trialType 
             const originalCorrectColorObject = colorInfo[data.original_correct_index];
 
             let shuffledCorrectIndex;
+
+            if (data.condition === 'revControl' || data.condition === 'revStroop') {
+              shuffledCorrectIndex = currentShuffledColorInfoForChoices.findIndex(
+                ci => ci.col.toLowerCase() === originalCorrectColorObject.col.toLowerCase()
+              );
+            } else {
+              shuffledCorrectIndex = currentShuffledColorInfoForChoices.findIndex(
+                ci => ci.str === originalCorrectColorObject.str
+              );
+            };
           },
-  if (data.condition === 'revControl' || data.condition === 'revStroop') {
-    shuffledCorrectIndex = currentShuffledColorInfoForChoices.findIndex(
-      ci => ci.col.toLowerCase() === originalCorrectColorObject.col.toLowerCase()
-    );
-  } else {
-    shuffledCorrectIndex = currentShuffledColorInfoForChoices.findIndex(
-      ci => ci.str === originalCorrectColorObject.str
-    );
-  }
 
   data.shuffled_correct_index = shuffledCorrectIndex;
   data.presented_choices_info = JSON.stringify(currentShuffledColorInfoForChoices);
