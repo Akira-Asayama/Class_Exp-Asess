@@ -181,21 +181,20 @@ function makeTimedBlock(stimuli, practice, timeLimit, trialType) { // trialType 
                 ci => ci.str === originalCorrectColorObject.str
               );
             };
-          },
 
-  data.shuffled_correct_index = shuffledCorrectIndex;
-  data.presented_choices_info = JSON.stringify(currentShuffledColorInfoForChoices);
+            data.shuffled_correct_index = shuffledCorrectIndex;
+            data.presented_choices_info = JSON.stringify(currentShuffledColorInfoForChoices);
+            
+            if (typeof data.response !== 'undefined' && data.response !== null) {
+              data.correct = Number(data.response) === shuffledCorrectIndex ? 1 : 0;
+            } else {
+              data.correct = 0;
+            }
 
-  if (typeof data.response !== 'undefined' && data.response !== null) {
-    data.correct = Number(data.response) === shuffledCorrectIndex ? 1 : 0;
-  } else {
-    data.correct = 0;
-  }
-
-  if (performance.now() - blockStart >= timeLimit) {
-    jsPsych.endCurrentTimeline();
-  }
-}
+            if (performance.now() - blockStart >= timeLimit) {
+              jsPsych.endCurrentTimeline();
+            }
+          }
         },
         ...(practice ? [{
           type: jsPsychHtmlKeyboardResponse,
