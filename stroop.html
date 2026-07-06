@@ -93,22 +93,38 @@ function makeSets() {
 }
 const { stroop, control, revStroop, revControl } = makeSets(); // この呼び出しは変更なし
 
-// Participant info form
+// Consent / initial instruction screen
 const timeline = [];
+
 timeline.push({
-  type: jsPsychSurveyHtmlForm,
-  preamble: '<h2>これから実験を開始します: 性別と年齢を入力してください</h2>',
-  html: `
-    <input type="radio" name="gender" value="1" required>男性
-    <input type="radio" name="gender" value="2">女性
-    <input type="radio" name="gender" value="3">その他
-    <div></div>
-    <select name="age" required>
-      <option value="">選択</option>
-      ${Array.from({length:71},(_,i)=>`<option value="${i+10}">${i+10}歳</option>`).join('')}
-    </select>
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `
+    <div style="max-width: 800px; margin: 0 auto; text-align: left; line-height: 1.8;">
+      <h2 style="text-align: center;">実験への参加について</h2>
+
+      <p>
+        この実験への参加は授業の一環です。
+      </p>
+
+      <p>
+        ただし，練習試行と本試行の間，および各実験条件の間の時間間隔については制限がありません。
+        必要に応じて休憩をとることができます。
+      </p>
+
+      <p>
+        授業時間中に実験に参加することが難しい場合には，
+        その場での実験への参加を中止または中断し，後日参加することも可能です。
+      </p>
+
+      <p>
+        実験の参加に同意していただける場合には，「次へ」を押してください。
+      </p>
+    </div>
   `,
-  button_label: '次へ'
+  choices: ['次へ'],
+  data: {
+    screen_type: 'consent_instruction'
+  }
 });
 
 // Timed block using timeline_variables
@@ -267,7 +283,7 @@ timeline.push({
   action: "save",
   experiment_id: expID,
   filename: filename,
-  data_string: () => jsPsych.data.get().csv(),
+  data_string: () => "\ufeff" + jsPsych.data.get().csv(),
   wait_message: "<p>データを送信しています。画面を閉じないでください。</p>"
 });
 
