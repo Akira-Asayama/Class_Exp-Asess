@@ -116,12 +116,288 @@ timeline.push({
   }
 });
 
+timeline.push({
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `
+    <div style="max-width: 800px; margin: 0 auto; text-align: left; line-height: 1.8;">
+      <h2 style="text-align: center;">実験の説明</h2>
+
+      <p>
+        社会活動のシミュレーションを行います。
+      </p>
+
+      <p>
+        参加者はコンピューター上でペアを割り当てられます。
+      </p>
+
+      <p>
+        参加者にはそれぞれ「協力」と「非協力」の2つの選択肢が与えられており，
+        そのどちらかを選択します。
+      </p>
+
+      <p>
+        その組み合わせに応じて，いくらかのポイントが得られます。
+        選択は一定回数繰り返されますので，自分のポイントを最大にすることを目標にして，
+        合理的な意思決定を行ってください。
+      </p>
+
+      <p>
+        選択は，おおよそ5秒以内で行ってください。
+      </p>
+
+      <p>
+        選択が遅れると，自動的に進行してしまいます。
+      </p>
+
+      <p style="text-align: center; margin-top: 32px;">
+        内容を確認したら，「次へ」を押してください。
+      </p>
+    </div>
+  `,
+  choices: ['次へ'],
+  data: {
+    screen_type: 'experiment_explanation'
+  }
+});
+
 // 1) フルスクリーン開始（ボタン押下待ち）
 timeline.push({
   type: jsPsychFullscreen,
   fullscreen_mode: true,
   message: '<p>これから全画面表示に切り替えます。</p>',
   button_label: '開始'
+});
+
+// 練習試行1：協力を選ぶ
+timeline.push({
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `
+    <div style="max-width: 800px; margin: 0 auto; text-align: center; line-height: 1.8;">
+      <h2>練習試行</h2>
+      <p>まず，自分が「協力」を選択した場合の得点について確認します。</p>
+      <p>下の画面で，「協力」を選んでください。</p>
+
+      <p>「協力」か「非協力」を選択してください。</p>
+      <p>得点パターンは以下の通りです：</p>
+
+      <table style="width:500px; margin: 20px auto; border-collapse: collapse; text-align:center;">
+        <thead>
+          <tr>
+            <th style="border:1px solid #000; padding:8px;"></th>
+            <th colspan="2" style="border:1px solid #000; padding:8px;">相手の選択</th>
+          </tr>
+          <tr>
+            <th style="border:1px solid #000; padding:8px;">あなたの選択</th>
+            <th style="border:1px solid #000; padding:8px;">協力</th>
+            <th style="border:1px solid #000; padding:8px;">非協力</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="border:1px solid #000; padding:8px;"><b>協力</b></td>
+            <td style="border:1px solid #000; padding:8px;">あなたの得点: 3<br>相手の得点: 3</td>
+            <td style="border:1px solid #000; padding:8px;">あなたの得点: 0<br>相手の得点: 5</td>
+          </tr>
+          <tr>
+            <td style="border:1px solid #000; padding:8px;"><b>非協力</b></td>
+            <td style="border:1px solid #000; padding:8px;">あなたの得点: 5<br>相手の得点: 0</td>
+            <td style="border:1px solid #000; padding:8px;">あなたの得点: 1<br>相手の得点: 1</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `,
+  choices: ['協力', '非協力'],
+  on_load: function() {
+    const buttons = jsPsych.getDisplayElement().querySelectorAll('button');
+    // 「非協力」ボタンを無効化
+    if (buttons[1]) {
+      buttons[1].disabled = true;
+      buttons[1].style.opacity = "0.4";
+      buttons[1].style.cursor = "not-allowed";
+    }
+  },
+  data: {
+    screen_type: 'practice_choose_cooperate'
+  }
+});
+
+// 協力を選んだ場合の得点説明
+timeline.push({
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `
+    <div style="max-width: 800px; margin: 0 auto; text-align: left; line-height: 1.8;">
+      <h2 style="text-align: center;">「協力」を選んだ場合の得点</h2>
+
+      <p>
+        自分が「協力」を選択した場合，相手の選択によって得点は次のように変わります。
+      </p>
+
+      <table style="width:600px; margin: 20px auto; border-collapse: collapse; text-align:center;">
+        <thead>
+          <tr>
+            <th style="border:1px solid #000; padding:8px;">自分の選択</th>
+            <th style="border:1px solid #000; padding:8px;">相手の選択</th>
+            <th style="border:1px solid #000; padding:8px;">自分の得点</th>
+            <th style="border:1px solid #000; padding:8px;">相手の得点</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="border:1px solid #000; padding:8px;">協力</td>
+            <td style="border:1px solid #000; padding:8px;">協力</td>
+            <td style="border:1px solid #000; padding:8px;"><strong>3点</strong></td>
+            <td style="border:1px solid #000; padding:8px;"><strong>3点</strong></td>
+          </tr>
+          <tr>
+            <td style="border:1px solid #000; padding:8px;">協力</td>
+            <td style="border:1px solid #000; padding:8px;">非協力</td>
+            <td style="border:1px solid #000; padding:8px;"><strong>0点</strong></td>
+            <td style="border:1px solid #000; padding:8px;"><strong>5点</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        つまり，自分が「協力」を選んだ場合，相手も「協力」を選べばお互いに3点が入ります。
+        一方で，相手が「非協力」を選択した場合には，自分は0点となり，相手に5点が入ります。
+      </p>
+
+      <p style="text-align: center; margin-top: 32px;">
+        内容を確認したら，「次へ」を押してください。
+      </p>
+    </div>
+  `,
+  choices: ['次へ'],
+  data: {
+    screen_type: 'practice_explain_cooperate'
+  }
+});
+
+// 練習試行2：非協力を選ぶ
+timeline.push({
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `
+    <div style="max-width: 800px; margin: 0 auto; text-align: center; line-height: 1.8;">
+      <h2>練習試行</h2>
+      <p>次に，自分が「非協力」を選択した場合の得点について確認します。</p>
+      <p>下の画面で，「非協力」を選んでください。</p>
+
+      <p>「協力」か「非協力」を選択してください。</p>
+      <p>得点パターンは以下の通りです：</p>
+
+      <table style="width:500px; margin: 20px auto; border-collapse: collapse; text-align:center;">
+        <thead>
+          <tr>
+            <th style="border:1px solid #000; padding:8px;"></th>
+            <th colspan="2" style="border:1px solid #000; padding:8px;">相手の選択</th>
+          </tr>
+          <tr>
+            <th style="border:1px solid #000; padding:8px;">あなたの選択</th>
+            <th style="border:1px solid #000; padding:8px;">協力</th>
+            <th style="border:1px solid #000; padding:8px;">非協力</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="border:1px solid #000; padding:8px;"><b>協力</b></td>
+            <td style="border:1px solid #000; padding:8px;">あなたの得点: 3<br>相手の得点: 3</td>
+            <td style="border:1px solid #000; padding:8px;">あなたの得点: 0<br>相手の得点: 5</td>
+          </tr>
+          <tr>
+            <td style="border:1px solid #000; padding:8px;"><b>非協力</b></td>
+            <td style="border:1px solid #000; padding:8px;">あなたの得点: 5<br>相手の得点: 0</td>
+            <td style="border:1px solid #000; padding:8px;">あなたの得点: 1<br>相手の得点: 1</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `,
+  choices: ['協力', '非協力'],
+  on_load: function() {
+    const buttons = jsPsych.getDisplayElement().querySelectorAll('button');
+    // 「協力」ボタンを無効化
+    if (buttons[0]) {
+      buttons[0].disabled = true;
+      buttons[0].style.opacity = "0.4";
+      buttons[0].style.cursor = "not-allowed";
+    }
+  },
+  data: {
+    screen_type: 'practice_choose_defect'
+  }
+});
+
+// 非協力を選んだ場合の得点説明
+timeline.push({
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `
+    <div style="max-width: 800px; margin: 0 auto; text-align: left; line-height: 1.8;">
+      <h2 style="text-align: center;">「非協力」を選んだ場合の得点</h2>
+
+      <p>
+        自分が「非協力」を選択した場合，相手の選択によって得点は次のように変わります。
+      </p>
+
+      <table style="width:600px; margin: 20px auto; border-collapse: collapse; text-align:center;">
+        <thead>
+          <tr>
+            <th style="border:1px solid #000; padding:8px;">自分の選択</th>
+            <th style="border:1px solid #000; padding:8px;">相手の選択</th>
+            <th style="border:1px solid #000; padding:8px;">自分の得点</th>
+            <th style="border:1px solid #000; padding:8px;">相手の得点</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="border:1px solid #000; padding:8px;">非協力</td>
+            <td style="border:1px solid #000; padding:8px;">協力</td>
+            <td style="border:1px solid #000; padding:8px;"><strong>5点</strong></td>
+            <td style="border:1px solid #000; padding:8px;"><strong>0点</strong></td>
+          </tr>
+          <tr>
+            <td style="border:1px solid #000; padding:8px;">非協力</td>
+            <td style="border:1px solid #000; padding:8px;">非協力</td>
+            <td style="border:1px solid #000; padding:8px;"><strong>1点</strong></td>
+            <td style="border:1px solid #000; padding:8px;"><strong>1点</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        つまり，自分が「非協力」を選んだ場合，相手が「協力」を選べば自分に5点が入り，相手は0点となります。
+        一方で，相手も「非協力」を選択した場合には，お互いに1点が入ります。
+      </p>
+
+      <p style="text-align: center; margin-top: 32px;">
+        内容を確認したら，「次へ」を押してください。
+      </p>
+    </div>
+  `,
+  choices: ['次へ'],
+  data: {
+    screen_type: 'practice_explain_defect'
+  }
+});
+
+// 本試行開始前の確認
+timeline.push({
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `
+    <div style="max-width: 800px; margin: 0 auto; text-align: center; line-height: 1.8;">
+      <h2>本試行の開始</h2>
+      <p>
+        これで練習試行と得点の説明は終了です。
+      </p>
+      <p>
+        それでは，準備ができましたら「次へ」をクリックして本試行を開始してください。
+      </p>
+    </div>
+  `,
+  choices: ['次へ'],
+  data: {
+    screen_type: 'ready_for_main_trials'
+  }
 });
 
 // 2) 各ブロックを順に実施
