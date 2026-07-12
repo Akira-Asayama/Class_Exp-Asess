@@ -1,0 +1,338 @@
+<!doctype html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet">
+  <script src="https://unpkg.com/jspsych@7.3.4"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-fullscreen@1.2.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.2.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.0"></script>
+  <script src="https://unpkg.com/@jspsych-contrib/plugin-pipe@0.4"></script>
+</head>
+<body></body>
+<script>
+
+const jsPsych = initJsPsych();
+
+const expID = "EBRzTwfMTrdV";
+const participantID = jsPsych.randomization.randomID(12);
+const filename = `prisoners_dilemma_${participantID}.csv`;
+
+// 利得行列の定義
+const payoff = {
+  'cooperate': {'cooperate': 3, 'defect': 0},
+  'defect':    {'cooperate': 5, 'defect': 1}
+};
+
+// スコア変数
+let selfCum = 0;
+let oppCum  = 0;
+
+// tit-for-tat 初回選択をランダムに
+let lastTFT = Math.random() < 0.5 ? 'cooperate' : 'defect';
+
+// 協力／競争条件の例外行動配列を生成
+function buildBehavior(main, nMain, alt, nAlt) {
+  return jsPsych.randomization.shuffle(
+    Array(nMain).fill(main).concat(Array(nAlt).fill(alt))
+  );
+}
+const coopBeh = buildBehavior('cooperate', 18, 'defect', 2);
+const compBeh = buildBehavior('defect',    18, 'cooperate', 2);
+let coopIdx = 0, compIdx = 0;
+
+// ブロック順（3条件）をシャッフル
+const blocks = jsPsych.randomization.shuffle(['tft','coop','comp']);
+
+jsPsych.data.addProperties({
+  participant_id: participantID,
+  study: "prisoners_dilemma",
+  block_order: blocks.join("-")
+});
+
+function waitThenFinishAfterButtonClick(waitMs = 2000) {
+  return function() {
+    const displayElement = jsPsych.getDisplayElement();
+    const trialStart = performance.now();
+    const buttons = displayElement.querySelectorAll("button");
+
+    buttons.forEach((button, index) => {
+      button.addEventListener("click", function() {
+        const rt = Math.round(performance.now() - trialStart);
+
+        // 二重クリック防止
+        buttons.forEach(b => {
+          b.disabled = true;
+          b.style.opacity = "0.6";
+          b.style.cursor = "not-allowed";
+        });
+
+        // 待機中表示を追加
+        const waitMessage = document.createElement("div");
+        waitMessage.innerHTML = `
+          <p style="margin-top: 24px; text-align: center; font-weight: bold;">
+            待機中
+          </p>
+        `;
+        displayElement.appendChild(waitMessage);
+
+        // 2秒後にtrial終了
+        setTimeout(function() {
+          jsPsych.finishTrial({
+            response: index,
+            rt: rt
+          });
+        }, waitMs);
+      }, { once: true });
+    });
+  };
+}
+
+const timeline = [];
+
+timeline.push({
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `
+    <div style="max-width: 800px; margin: 0 auto; text-align: left; line-height: 1.8;">
+      <h2 style="text-align: center;">実験への参加について</h2>
+
+      <p>
+        この実験への参加は授業の一環です。
+      </p>
+
+      <p>
+        授業時間中に実験に参加することが難しい場合には，
+        その場での実験への参加を中止または中断し，後日参加することも可能です。
+      </p>
+
+      <p>
+        実験の参加に同意していただける場合には，「次へ」を押してください。
+      </p>
+    </div>
+  `,
+  choices: ['次へ'],
+  data: {
+    screen_type: 'consent_instruction'
+  }
+});
+
+// 1) フルスクリーン開始（ボタン押下待ち）
+timeline.push({
+  type: jsPsychFullscreen,
+  fullscreen_mode: true,
+  message: '<p>これから全画面表示に切り替えます。</p>',
+  button_label: '開始'
+});
+
+// 2) 各ブロックを順に実施
+blocks.forEach((cond, bi) => {
+  const idx = bi + 1;
+  let previousOpponentChoiceStr = ''; // ★★★ ここで宣言・初期化 ★★★
+
+  // ブロック開始教示（10秒固定）＋スコアリセット
+  timeline.push({
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: `<p>${idx}人目の相手とのゲームを開始します。</p>`,
+    choices: "NO_KEYS",
+    trial_duration: 10000,
+    on_finish: function() {
+      selfCum = 0;
+      oppCum  = 0;
+    }
+  });
+
+  // 20 試行ループ
+  for (let i = 0; i < 20; i++) {
+    // （A）意思決定画面
+    timeline.push({
+      type: jsPsychHtmlButtonResponse,
+      stimulus: function() {
+        let opponentChoiceDisplay = '';
+        if (previousOpponentChoiceStr !== '') { // previousOpponentChoiceStr を参照
+          const opponentChoiceText = previousOpponentChoiceStr === 'cooperate' ? '協力' : '非協力';
+          opponentChoiceDisplay = `
+            <p style="text-align: center; margin-bottom: 15px; font-size: 1.1em; color: #333;">
+              先ほどの相手の選択： <strong style="color: #007bff;">${opponentChoiceText}</strong>
+            </p>
+          `;
+        }
+
+        return `
+          ${opponentChoiceDisplay} 
+          <p>「協力」か「非協力」を選択してください。</p>
+          <p>得点パターンは以下の通りです：</p>
+          <table style="width:500px; margin: 20px auto; border-collapse: collapse; text-align:center;">
+            <thead>
+              <tr>
+                <th style="border:1px solid #000; padding:8px;"></th>
+                <th colspan="2" style="border:1px solid #000; padding:8px;">相手の選択</th>
+              </tr>
+              <tr>
+                <th style="border:1px solid #000; padding:8px;">あなたの選択</th>
+                <th style="border:1px solid #000; padding:8px;">協力</th>
+                <th style="border:1px solid #000; padding:8px;">非協力</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="border:1px solid #000; padding:8px;"><b>協力</b></td>
+                <td style="border:1px solid #000; padding:8px;">あなたの得点: ${payoff.cooperate.cooperate}<br>相手の得点: ${payoff.cooperate.cooperate}</td>
+                <td style="border:1px solid #000; padding:8px;">あなたの得点: ${payoff.cooperate.defect}<br>相手の得点: ${payoff.defect.cooperate}</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #000; padding:8px;"><b>非協力</b></td>
+                <td style="border:1px solid #000; padding:8px;">あなたの得点: ${payoff.defect.cooperate}<br>相手の得点: ${payoff.cooperate.defect}</td>
+                <td style="border:1px solid #000; padding:8px;">あなたの得点: ${payoff.defect.defect}<br>相手の得点: ${payoff.defect.defect}</td>
+              </tr>
+            </tbody>
+          </table>
+        `;
+      },
+      choices: ['協力','非協力'],
+      response_ends_trial: false,
+      trial_duration: null,
+      on_load: waitThenFinishAfterButtonClick(2000),
+      data: { condition: cond, trial_in_block: i + 1, block: idx },
+      on_finish: function(data) {
+        console.log(`Decision Phase - Button pressed: ${data.response}, Type: ${typeof data.response}`);
+        const buttonPressedNumeric = data.response === null ? null : parseInt(data.response, 10);
+        if (buttonPressedNumeric === null) {
+          data.selfChoice = 'defect';
+          console.log("Decision Phase - Outcome: Timed out. selfChoice set to 'defect'.");
+        } else if (buttonPressedNumeric === 0) {
+          data.selfChoice = 'cooperate';
+          console.log("Decision Phase - Outcome: Button 0 (協力) pressed. selfChoice set to 'cooperate'.");
+        } else if (buttonPressedNumeric === 1) {
+          data.selfChoice = 'defect';
+          console.log("Decision Phase - Outcome: Button 1 (非協力) pressed. selfChoice set to 'defect'.");
+        } else {
+          data.selfChoice = 'defect';
+          console.log(`Decision Phase - Outcome: Unexpected response value (${data.response}). selfChoice set to 'defect'.`);
+        }
+        console.log(`Decision Phase - Final selfChoice (string): ${data.selfChoice}`);
+      }
+    });
+      
+    // （B）フィードバック画面
+    timeline.push({
+      type: jsPsychHtmlButtonResponse,
+      stimulus: function() {
+        const last = jsPsych.data.get().last(1).values()[0];
+        const selfChoiceStr = last.selfChoice;
+
+        console.log(`Feedback Phase - selfChoiceStr from previous trial: ${selfChoiceStr}, Type: ${typeof selfChoiceStr}`);
+        console.log(`Feedback Phase - Is selfChoiceStr === 'cooperate'? ${selfChoiceStr === 'cooperate'}`);
+          
+        let oppChoice;
+        if (cond === 'tft') { oppChoice = lastTFT; }
+        else if (cond === 'coop') { oppChoice = coopBeh[coopIdx++]; }
+        else { oppChoice = compBeh[compIdx++]; }
+        
+        previousOpponentChoiceStr = oppChoice; // ★★★ 相手の選択を保存 ★★★
+
+        const selfPt = payoff[selfChoiceStr][oppChoice];
+        const oppPt  = payoff[oppChoice][selfChoiceStr];
+        selfCum += selfPt;
+        oppCum  += oppPt;
+        if (cond === 'tft') { lastTFT = selfChoiceStr; }
+        const selfChoiceNumeric = (selfChoiceStr === 'cooperate' ? 1 : 0);
+        console.log(`Feedback Phase - selfChoiceNumeric for CSV: ${selfChoiceNumeric}`);
+        jsPsych.data.get().addToLast({
+          selfChoice: selfChoiceNumeric, opponentChoice: (oppChoice === 'cooperate' ? 1 : 0),
+          selfPayoff: selfPt, opponentPayoff: oppPt,
+          selfCumulative: selfCum, opponentCumulative: oppCum
+        });
+
+        // フィードバック画面のHTML生成
+        const feedbackHTML = `
+          <div style="width: 100%; max-width: 600px; margin: 0 auto;">
+            <p style="text-align: center; font-size: 1.2em; font-weight: bold; margin-bottom: 15px;">先ほどの選択の結果</p>
+            <table style="width:100%; text-align:center; border-collapse:collapse;">
+              <tr style="background-color:#f2f2f2;">
+                <td style="border:1px solid #000; padding:4px;">
+                  あなたの選択：<strong>${ selfChoiceStr === 'cooperate' ? '協力' : '非協力' }</strong>
+                </td>
+                <td style="border:1px solid #000; padding:4px;">
+                  相手の選択：<strong><u>${ oppChoice === 'cooperate' ? '協力' : '非協力' }</strong></u>
+                </td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #000; padding:4px;">
+                  あなたの得点：<strong><u>${ selfPt }点</strong></u>
+                </td>
+                <td style="border:1px solid #000; padding:4px;">
+                  相手の得点：<strong>${ oppPt }点</strong>
+                </td>
+              </tr>
+              <tr style="background-color:#f2f2f2;">
+                <td style="border:1px solid #000; padding:4px;">
+                  あなたの累積得点：${ selfCum }点
+                </td>
+                <td style="border:1px solid #000; padding:4px;">
+                  相手の累積得点：${ oppCum }点
+                </td>
+              </tr>
+            </table>
+          </div>
+        `;
+        return feedbackHTML;
+      },
+      choices: ['次へ'],
+      response_ends_trial: false,
+      trial_duration: null,
+      on_load: waitThenFinishAfterButtonClick(2000)
+    });
+  } // ← for ループの終了
+
+  // ブロック終了教示
+  timeline.push({
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: `<p>これで、${idx}人目の相手とのゲームを終了します。</p>`,
+    choices: "NO_KEYS",
+    trial_duration: 10000,
+    on_finish: function() {
+        previousOpponentChoiceStr = ''; // ★★★ 保存した相手の選択をクリア ★★★
+    }
+  });
+
+}); // ← blocks.forEach の終了
+
+// 3) フルスクリーン解除
+timeline.push({
+  type: jsPsychFullscreen,
+  fullscreen_mode: false,
+  delay_after: 0
+});
+
+// 4) 実験終了画面＋CSV ダウンロード
+timeline.push({
+  type: jsPsychHtmlButtonResponse,
+  stimulus: '<p>実験は終了です。おつかれさまでした。</p><p>「送信」を押すと，データを送信します。送信が完了するまで画面を閉じないでください。</p>',
+  choices: ['送信']
+});
+
+timeline.push({
+  type: jsPsychPipe,
+  action: "save",
+  experiment_id: expID,
+  filename: filename,
+  data_string: () => "\ufeff" + jsPsych.data.get()
+  .filterCustom(row =>
+    row.condition !== undefined &&
+    row.trial_in_block !== undefined
+  )
+  .csv(),
+  wait_message: "<p>データを送信しています。画面を閉じないでください。</p>"
+});
+
+timeline.push({
+  type: jsPsychHtmlButtonResponse,
+  stimulus: '<p>データの送信が完了しました。ご協力ありがとうございました。</p><p>この画面を閉じてください。</p>',
+  choices: []
+});
+
+// 実験開始
+jsPsych.run(timeline);
+
+</script>
+</html>
