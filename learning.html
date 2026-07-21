@@ -118,15 +118,15 @@ function csvEscape(value) {
 }
 
 function makeReverseRecallLongCSV() {
-  const reverseTrial = jsPsych.data.get()
+  const reverseTrials = jsPsych.data.get()
     .filter({ phase: "reverse_recall_summary" })
-    .values()[0];
+    .values();
 
-  if (!reverseTrial || !reverseTrial.reverse_recall_results) {
-    return "\ufeff";
+  if (reverseTrials.length === 0 || !reverseTrials[0].reverse_recall_results) {
+    return "\ufefferror,message\nNO_REVERSE_RECALL_DATA,reverse_recall_summary was not found\n";
   }
 
-  const results = JSON.parse(reverseTrial.reverse_recall_results);
+  const results = JSON.parse(reverseTrials[0].reverse_recall_results);
 
   const headers = [
     "participant_id",
