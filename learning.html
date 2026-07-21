@@ -678,13 +678,71 @@ timeline.push({
 });
 
 timeline.push({
-  type: jsPsychPipe,
-  action: "save",
-  experiment_id: expID,
-  filename: filename,
-  data_string: () => makeReverseRecallLongCSV(),
-  wait_message: "<p>データを送信しています。画面を閉じないでください。</p>",
-  compression: false
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    <div style="text-align: center; line-height: 1.8;">
+      <p>データを送信しています。</p>
+      <p>送信が完了するまで画面を閉じないでください。</p>
+    </div>
+  `,
+  choices: "NO_KEYS",
+  on_load: async function() {
+    const csvData = makeReverseRecallLongCSV();
+
+    console.log("DataPipe直接送信確認");
+    console.log("experimentID:", expID);
+    console.log("filename:", filename);
+    console.log("csv length:", csvData.length);
+    console.log("csv preview:", csvData.slice(0, 200));
+
+    try {
+      const response = await fetch("https://pipe.jspsych.org/api/data/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          experimentID: expID,
+          filename: filename,
+          data: csvData
+        })
+      });
+
+      const responseText = await response.text();
+
+      console.log("DataPipe response status:", response.status);
+      console.log("DataPipe response:", responseText);
+
+      if (!response.ok) {
+        throw new Error(responseText);
+      }
+
+      jsPsych.finishTrial({
+        phase: "datapipe_save",
+        datapipe_success: 1,
+        datapipe_status: response.status,
+        datapipe_response: responseText
+      });
+
+    } catch (error) {
+      console.error("DataPipe送信エラー:", error);
+
+      const displayElement = jsPsych.getDisplayElement();
+      displayElement.innerHTML = `
+        <div style="max-width: 800px; margin: 0 auto; text-align: left; line-height: 1.8;">
+          <h2 style="text-align: center;">データ送信エラー</h2>
+          <p>データ送信中にエラーが発生しました。</p>
+          <p>この画面を閉じずに，以下のエラー内容を実験者に知らせてください。</p>
+          <pre style="
+            white-space: pre-wrap;
+            background: #f5f5f5;
+            border: 1px solid #ccc;
+            padding: 12px;
+          ">${escapeHTML(String(error.message))}</pre>
+        </div>
+      `;
+    }
+  }
 });
 
 timeline.push({
