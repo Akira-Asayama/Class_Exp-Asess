@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>対連合学習実験</title>
+  <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet">
+  <script src="https://unpkg.com/jspsych@7.3.4"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.2.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-fullscreen@1.2.0"></script>
+  <script src="https://unpkg.com/@jspsych-contrib/plugin-pipe@0.4"></script>
+  <style>
+    body {
+      font-family: Meiryo, 'Hiragino Kaku Gothic ProN', 'MS PGothic', sans-serif;
+    }
+    .jspsych-content {
+      max-width: 800px;
+      margin: auto;
+      text-align: center;
+    }
+    .instruction-text {
+      text-align: left;
+      line-height: 1.8;
+      margin-bottom: 20px; 
+    }
+    .stimulus-pair-container { 
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .stimulus-pair {
+        min-height: 120px; 
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        width: 100%; 
+    }
+    .stimulus-pair p, .stimulus-word p {
+        font-size: 48px; 
+        margin: 20px 0;
+    }
+    .jspsych-btn {
+        font-size: 16px;
+        padding: 10px 20px;
+        margin-top: 20px; 
+    }
+    .progress-dots-container {
+      text-align: center;
+      margin-top: 10px; 
+      margin-bottom: 15px; 
+      line-height: 12px; 
+      width: 100%; 
+    }
+    .progress-dot {
+      display: inline-block;
+      width: 12px;  
+      height: 12px; 
+      background-color: #ddd; 
+      border-radius: 50%;     
+      margin: 0 3px;          
+    }
+    .progress-dot.completed {
+      background-color: #4CAF50; 
+    }
+  </style>
+</head>
+<body></body>
+<script>
+  // --- 実験条件の割り当て (参加者間要因) ---
+  const jsPsych = initJsPsych();
+
+  const expID = "OaWsYD0moEXZ";
+  const participantID = jsPsych.randomization.randomID(12);
+  const filename = `paired_associate_${participantID}.csv`;
+
+  // --- 刺激リスト ---
+  const high_association_words = [
+    { spanish: 'ballena', japanese: 'くじら', type: 'high' }, { spanish: 'cabra', japanese: 'やぎ', type: 'high' },
+    { spanish: 'cama', japanese: 'べっど', type: 'high' }, { spanish: 'cara', japanese: 'かお', type: 'high' },
+    { spanish: 'cartela', japanese: 'かばん', type: 'high' }, { spanish: 'casa', japanese: 'いえ', type: 'high' },
+    { spanish: 'lobo', japanese: 'おおかみ', type: 'high' }, { spanish: 'manga', japanese: 'そで', type: 'high' },
+    { spanish: 'mesa', japanese: 'てーぶる', type: 'high' }, { spanish: 'pared', japanese: 'かべ', type: 'high' }
+  ];
+  const low_association_words = [
+    { spanish: 'cortina', japanese: 'かーてん', type: 'low' }, { spanish: 'ducha', japanese: 'しゃわー', type: 'low' },
+    { spanish: 'estrella', japanese: 'ほし', type: 'low' }, { spanish: 'falda', japanese: 'すかーと', type: 'low' },
+    { spanish: 'gafas', japanese: 'めがね', type: 'low' }, { spanish: 'guantes', japanese: 'てぶくろ', type: 'low' },
+    { spanish: 'leche', japanese: 'みるく', type: 'low' }, { spanish: 'nieve', japanese: 'ゆき', type: 'low' },
+    { spanish: 'sudor', japanese: 'あせ', type: 'low' }, { spanish: 'zapato', japanese: 'くつ', type: 'low' }
+  ];
+  const all_stimuli = high_association_words.concat(low_association_words);
+
+function escapeHTML(str) {
+  return String(str)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function normalizeSpanishAnswer(str) {
+  return String(str || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "");
+}
+
+function csvEscape(value) {
+  if (value === null || value === undefined) return "";
+  const str = String(value);
+  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+    return '"' + str.replaceAll('"', '""') + '"';
+  }
+  return str;
+}
+
+function makeReverseRecallLongCSV() {
+  const reverseTrial = jsPsych.data.get()
+    .filter({ phase: "reverse_recall_summary" })
+    .values()[0];
+
+  if (!reverseTrial || !reverseTrial.reverse_recall_results) {
+    return "\ufeff";
+  }
+
+  const results = JSON.parse(reverseTrial.reverse_recall_results);
+
+  const headers = [
+    "participant_id",
+    "study",
+    "assigned_condition",
+    "condition_number",
+    "phase",
+    "test_order",
+    "word_type",
+    "cue_japanese",
+    "correct_spanish",
+    "response",
+    "correct",
+    "end_reason",
+    "total_time_ms"
+  ];
+
+  const lines = results.map(row => {
+    return headers.map(h => csvEscape(row[h])).join(",");
+  });
+
+  return "\ufeff" + headers.join(",") + "\n" + lines.join("\n");
+}
+
+  async function createExperiment() {
+    const conditionNumber = await jsPsychPipe.getCondition(expID);
+
+    const assigned_condition = conditionNumber === 0 ? 'keyword' : 'control';
+
+    jsPsych.data.addProperties({
+      participant_id: participantID,
+      study: "paired_associate_learning",
+      assigned_condition: assigned_condition,
+      condition_number: conditionNumber
+    });
+
+    let timeline = [];
+
+  // --- 最初の教示 ---
+
+  timeline.push({
+    type: jsPsychHtmlButtonResponse,
+    stimulus: `
+      <div class='instruction-text'>
+        <h2 style="text-align: center;">実験への参加について</h2>
+        <p>この実験への参加は授業の一環です。</p>
+        <p>記憶ステップ，再生ステップ，各ブロックの間では，必要に応じて休憩をとることができます。</p>
+        <p>授業時間中に実験に参加することが難しい場合には，その場での参加を中止または中断し，後日参加することも可能です。</p>
+        <p>実験の参加に同意していただける場合には，「次へ」を押してください。</p>
+      </div>
+    `,
+    choices: ['次へ'],
+    data: {
+      screen_type: 'consent_instruction'
+    }
+  });
+
+  const instruction_welcome = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: `
+      <div class='instruction-text'>
+        <p>実験にご協力いただきありがとうございます。</p>
+        <p>これからスペイン語の単語とその日本語の意味を覚えていただく課題を行います。</p>
+        <p>単語とその意味を覚える記憶ステップと，それを思い出す練習をする再生ステップを，合計3回行ってもらいます。</p>
+        <p>準備ができましたら，「次へ」ボタンを押して進んでください。</p>
+      </div>`,
+    choices: ['次へ'], 
+    post_trial_gap: 250
+  };
+  timeline.push(instruction_welcome);
+
+  // --- 全画面表示開始 ---
+  const enter_fullscreen_trial = {
+    type: jsPsychFullscreen, 
+    fullscreen_mode: true, 
+    message: '', 
+    button_label: '続ける', 
+    delay_after: 200
+  };
+  timeline.push(enter_fullscreen_trial);
+
+  // --- 条件ごとの教示 ---
+  const instruction_group = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: function() {
+      if (assigned_condition === 'keyword') {
+        return `
+          <div class='instruction-text'>
+            <p><b>記憶方法について：</b></p>
+            <p>外国語の単語を覚える場合，<b>キーワード法</b>を用いるとよく覚えられます。キーワード法というのは，次のようなやり方をします。</p>
+            <p>一例として，ドイツ語のKopfという単語の意味（頭）を覚える場合について説明します。</p>
+            <p>まず，Kopfというドイツ語の単語と発音のよく似た日本語，たとえば<b>”コップ”</b>を連想してください。この”コップ”という日本語がキーワードとなります。</p>
+            <p>次に，”コップ”とKopfの意味である<b>”頭”</b>が何らかの形で関係しあっている場面をイメージしてください。</p>
+            <p>たとえば，”<b>人が頭にコップをのせている</b>”場面などを思い浮かべるのです。</p>
+            <p>今から覚えてもらうスペイン語の単語も全て，<b>このキーワード法を使って</b>覚えてください。</p>
+            <p><br>キーワード法を実践する準備ができましたら，「次へ」ボタンを押して記憶ステップを開始してください。</p>
+          </div>`;
+      } else {
+        return `
+          <div class='instruction-text'>
+            <p><b>記憶方法について：</b></p>
+            <p>どんなやり方で覚えてもかまいませんから，できるだけ多く覚えてください。</p>
+            <p><br>準備ができましたら，「次へ」ボタンを押して記憶ステップを開始してください。</p>
+          </div>`;
+      }
+    },
+    choices: ['次へ'], 
+    post_trial_gap: 250
+  };
+  timeline.push(instruction_group);
+
+  // --- 記憶ステップ全体の設定 ---
+  const learning_duration_limit_ms = 3 * 60 * 1000; 
+  let learning_block_timeout = null; 
+  let is_first_trial_in_this_learning_block; 
+  let time_is_up_flag = false; 
+
+  // --- ③ 習得試行（学習試行＋テスト試行）x 3回 ---
+  const num_acquisition_blocks = 3;
+  for (let block = 0; block < num_acquisition_blocks; block++) {
+    const acquisition_block_intro = {
+        type: jsPsychHtmlButtonResponse,
+        stimulus: `
+          <div> 
+            <p><b>記憶ステップ ${block + 1} / ${num_acquisition_blocks}</b></p>
+            <div class='instruction-text'> 
+              <p>それでは，今から，20個のスペイン語の単語の意味を覚えてもらいます。</p>
+              <p>単語とその意味の組み合わせが，1組ずつ表示されます。</p>
+              <p>ご自身のペースで「次へ」ボタンを押して，次の単語に進んでください。20語すべて見終わると，最初の単語に戻ります。</p>
+              <p>この記憶ステップ全体には約3分間の制限時間があります（時間は表示されません）。制限時間を過ぎると，自動的に次のステップに進みます。</p>
+              <p>「次へ」ボタンを押したら，開始されます。</p>
+            </div>
+          </div>`,
+        choices: ['次へ'], 
+        post_trial_gap: 250,
+        on_finish: function() {
+            is_first_trial_in_this_learning_block = true;
+            time_is_up_flag = false;
+        }
+    };
+    timeline.push(acquisition_block_intro);
+
+    const current_block_learning_stimuli = jsPsych.randomization.shuffle([...all_stimuli]).map((stim, index, arr) => ({
+      stimulus_pair: stim,
+      stim_index: index,
+      total_stims: arr.length
+    }));
+
+    const learning_trials_block = {
+      timeline: [
+        {
+          type: jsPsychHtmlButtonResponse,
+          stimulus: function() {
+            const stim_obj_raw = jsPsych.timelineVariable('stimulus_pair');
+            const stim_index_raw = jsPsych.timelineVariable('stim_index');
+            const total_stims_raw = jsPsych.timelineVariable('total_stims');
+
+            let actual_stim_data = stim_obj_raw;
+            if (typeof stim_obj_raw === 'function') {
+              try { actual_stim_data = stim_obj_raw(); }
+              catch (e) { actual_stim_data = null; }
+            }
+            let stim_index = stim_index_raw;
+            if (typeof stim_index_raw === 'function') {
+              try { stim_index = stim_index_raw(); }
+              catch (e) { stim_index = -1; } 
+            }
+            let total_stims = total_stims_raw;
+            if (typeof total_stims_raw === 'function') {
+              try { total_stims = total_stims_raw(); }
+              catch (e) { total_stims = 0; } 
+            }
+            
+            let progress_dots_html = '<div class="progress-dots-container">';
+            if (total_stims > 0 && stim_index >= 0 && stim_index < total_stims) {
+                for (let i = 0; i < total_stims; i++) {
+                    if (i <= stim_index) {
+                        progress_dots_html += '<span class="progress-dot completed"></span>';
+                    } else {
+                        progress_dots_html += '<span class="progress-dot"></span>';
+                    }
+                }
+            } else { 
+                const default_dots = total_stims > 0 ? total_stims : 20; 
+                for (let i = 0; i < default_dots ; i++) { 
+                    progress_dots_html += '<span class="progress-dot"></span>';
+                }
+            }
+            progress_dots_html += '</div>';
+
+            let stimulus_html = '<div class="stimulus-pair-container">';
+            stimulus_html += progress_dots_html; 
+
+            if (actual_stim_data && typeof actual_stim_data.spanish !== 'undefined' && typeof actual_stim_data.japanese !== 'undefined') {
+              stimulus_html += `<div class="stimulus-pair"><p>${actual_stim_data.spanish}</p><p>${actual_stim_data.japanese}</p></div>`;
+            } else {
+              stimulus_html += `<div class="stimulus-pair"><p>表示エラー</p><p>表示エラー</p></div>`; 
+            }
+            stimulus_html += '</div>'; 
+            return stimulus_html;
+          },
+          choices: ['次へ'],
+          button_html: '<button class="jspsych-btn">%choice%</button>',
+          on_load: function() {
+            if (is_first_trial_in_this_learning_block) {
+              if (learning_block_timeout) { clearTimeout(learning_block_timeout); }
+              learning_block_timeout = setTimeout(function() {
+                time_is_up_flag = true; 
+                jsPsych.finishTrial(); 
+              }, learning_duration_limit_ms);
+              is_first_trial_in_this_learning_block = false; 
+            }
+          },
+          on_finish: function() {
+            if (time_is_up_flag) {
+              jsPsych.endCurrentTimeline();
+            }
+          }
+        }
+      ],
+      timeline_variables: current_block_learning_stimuli, 
+      repetitions: 100, 
+      on_timeline_finish: function() {
+        if (learning_block_timeout) {
+            clearTimeout(learning_block_timeout);
+            learning_block_timeout = null;
+        }
+        time_is_up_flag = false; 
+      }
+    };
+    timeline.push(learning_trials_block);
+
+    const test_phase_intro = {
+        type: jsPsychHtmlButtonResponse,
+        stimulus: `
+          <div> 
+            <p><b>再生ステップ ${block + 1} / ${num_acquisition_blocks}</b></p>
+            <div class='instruction-text'> 
+              <p>それでは，今から，覚えたスペイン語の単語を思い出す練習をしてもらいます。</p>
+              <p>スペイン語の単語が1つずつ4秒間表示されます。</p>
+              <p>その単語に対応する日本語の意味を思い出して，<b>周りに聞こえないように小さな声で</b>答えてください。</p>
+              <p>単語は自動的に，次々に表示されますので，その間，画面を操作をする必要はありません。単語の意味を思い出すことに集中してください。</p>
+              <p>「次へ」ボタンを押したら，開始されます。</p>
+            </div>
+          </div>`,
+        choices: ['次へ'], 
+        post_trial_gap: 250
+    };
+    timeline.push(test_phase_intro);
+
+    const test_stimuli_shuffled = jsPsych.randomization.shuffle([...all_stimuli]); 
+    const test_trials_procedure = {
+      timeline: [
+        {
+          type: jsPsychHtmlKeyboardResponse,
+          stimulus: function() {
+            let current_test_stim_raw = jsPsych.timelineVariable('stimulus_word');
+            let actual_test_stim = current_test_stim_raw;
+            if (typeof current_test_stim_raw === 'function'){
+              try { 
+                actual_test_stim = current_test_stim_raw(); 
+              } catch (e) { 
+                actual_test_stim = null; 
+              }
+            }
+
+            if (actual_test_stim && typeof actual_test_stim.spanish !== 'undefined') {
+                 return `
+                   <div class="stimulus-word">
+                     <p>${actual_test_stim.spanish}</p>
+                   </div>`;
+            } else {
+                return `
+                  <div class="stimulus-word">
+                    <p>表示エラー</p>
+                  </div>`;
+            }
+          },
+          choices: "NO_KEYS",
+          trial_duration: 4000,
+          post_trial_gap: 500
+        }
+      ],
+      timeline_variables: test_stimuli_shuffled.map((stim_item) => {
+        return { stimulus_word: stim_item };
+      }),
+    };
+    timeline.push(test_trials_procedure);
+
+    if (block < num_acquisition_blocks - 1) {
+        const inter_block_message = {
+            type: jsPsychHtmlButtonResponse,
+            stimulus: `
+              <div>
+                <p>再生ステップ ${block + 1} が終了しました。</p>
+                <p>準備ができたら「次へ」ボタンを押してください。</p>
+              </div>`,
+            choices: ['次へ'], 
+            post_trial_gap: 250
+        };
+        timeline.push(inter_block_message);
+    }
+  }
+
+// --- 5分間の休憩 ---
+timeline.push({
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    <div style="max-width: 800px; margin: 0 auto; text-align: center; line-height: 1.8;">
+      <h2>休憩</h2>
+      <p>これで再生ステップは終了です。</p>
+      <p>これから5分間の休憩をとります。</p>
+      <p>5分経過すると，自動的に次の画面に進みます。</p>
+
+      <div id="rest-timer" style="
+        margin-top: 32px;
+        font-size: 32px;
+        font-weight: bold;
+        border: 2px solid #333;
+        padding: 16px;
+        display: inline-block;
+      ">
+        残り時間：5分00秒
+      </div>
+    </div>
+  `,
+  choices: "NO_KEYS",
+  trial_duration: 5 * 60 * 1000,
+  data: {
+    screen_type: "rest_before_reverse_recall"
+  },
+  on_load: function() {
+    const totalSeconds = 5 * 60;
+    let remainingSeconds = totalSeconds;
+
+    const timerElement = document.getElementById("rest-timer");
+
+    const intervalID = setInterval(function() {
+      remainingSeconds -= 1;
+
+      if (remainingSeconds < 0) {
+        remainingSeconds = 0;
+      }
+
+      const minutes = Math.floor(remainingSeconds / 60);
+      const seconds = remainingSeconds % 60;
+
+      timerElement.textContent =
+        `残り時間：${minutes}分${String(seconds).padStart(2, "0")}秒`;
+
+      if (remainingSeconds <= 0) {
+        clearInterval(intervalID);
+      }
+    }, 1000);
+  }
+});
+
+// --- 逆方向再生テストの教示 ---
+timeline.push({
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `
+    <div style="max-width: 800px; margin: 0 auto; text-align: left; line-height: 1.8;">
+      <h2 style="text-align: center;">逆方向再生テスト</h2>
+
+      <p>
+        これから，日本語の意味を見て，対応するスペイン語の単語を思い出して入力してください。
+      </p>
+
+      <p>
+        全20語が一度に表示されます。どの順番で回答してもかまいません。
+        分かるものから自由に回答してください。
+      </p>
+
+      <p>
+        制限時間は120秒です。時間になると，自動的に終了します。
+      </p>
+
+      <p>
+        制限時間内にできるだけ多く回答してください。
+      </p>
+
+      <p style="text-align: center; margin-top: 32px;">
+        準備ができましたら，「開始」を押してください。
+      </p>
+    </div>
+  `,
+  choices: ["開始"],
+  data: {
+    screen_type: "reverse_recall_instruction"
+  }
+});
+
+// --- 逆方向再生テスト ---
+const reverse_test_stimuli = jsPsych.randomization.shuffle([...all_stimuli]);
+
+timeline.push({
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: function() {
+    const itemRows = reverse_test_stimuli.map((stim, index) => {
+      return `
+        <div style="
+          display: grid;
+          grid-template-columns: 60px 1fr 1.5fr;
+          gap: 12px;
+          align-items: center;
+          padding: 10px 0;
+          border-bottom: 1px solid #ddd;
+        ">
+          <div style="text-align: right;">${index + 1}.</div>
+          <div style="font-size: 22px; font-weight: bold;">
+            ${escapeHTML(stim.japanese)}
+          </div>
+          <div>
+            <input
+              type="text"
+              id="reverse-response-${index}"
+              autocomplete="off"
+              style="
+                width: 95%;
+                font-size: 20px;
+                padding: 8px;
+                box-sizing: border-box;
+              "
+            >
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    return `
+      <div style="max-width: 900px; margin: 0 auto; text-align: left; line-height: 1.7;">
+        <h2 style="text-align: center;">逆方向再生テスト</h2>
+
+        <p>
+          日本語の意味を見て，対応するスペイン語の単語を入力してください。
+          どの順番で回答してもかまいません。
+        </p>
+
+        <div id="reverse-timer" style="
+          position: sticky;
+          top: 0;
+          background: white;
+          border: 2px solid #333;
+          padding: 10px;
+          margin: 16px 0;
+          text-align: center;
+          font-size: 24px;
+          font-weight: bold;
+          z-index: 10;
+        ">
+          残り時間：120秒
+        </div>
+
+        <div style="
+          display: grid;
+          grid-template-columns: 60px 1fr 1.5fr;
+          gap: 12px;
+          font-weight: bold;
+          border-bottom: 2px solid #333;
+          padding-bottom: 8px;
+          margin-bottom: 4px;
+        ">
+          <div></div>
+          <div>日本語</div>
+          <div>スペイン語の回答</div>
+        </div>
+
+        ${itemRows}
+
+        <div style="height: 40px;"></div>
+      </div>
+    `;
+  },
+  choices: "NO_KEYS",
+  trial_duration: null,
+  data: {
+    phase: "reverse_recall_screen"
+  },
+  on_load: function() {
+    const startTime = performance.now();
+    const timeLimitMs = 120000;
+    let remainingSeconds = 120;
+    let ended = false;
+
+    const timerElement = document.getElementById("reverse-timer");
+
+    const timerInterval = setInterval(function() {
+      remainingSeconds -= 1;
+
+      if (remainingSeconds < 0) {
+        remainingSeconds = 0;
+      }
+
+      timerElement.textContent = `残り時間：${remainingSeconds}秒`;
+
+      if (remainingSeconds <= 0) {
+        clearInterval(timerInterval);
+      }
+    }, 1000);
+
+    setTimeout(function() {
+      finishReverseRecallTest();
+    }, timeLimitMs);
+
+    function finishReverseRecallTest() {
+      if (ended) return;
+      ended = true;
+
+      clearInterval(timerInterval);
+
+      const totalTimeMs = Math.round(performance.now() - startTime);
+
+      const results = reverse_test_stimuli.map((stim, index) => {
+        const inputElement = document.getElementById(`reverse-response-${index}`);
+        const response = inputElement ? inputElement.value : "";
+
+        const correct =
+          normalizeSpanishAnswer(response) === normalizeSpanishAnswer(stim.spanish)
+            ? 1
+            : 0;
+
+        return {
+          participant_id: participantID,
+          study: "paired_associate_learning",
+          assigned_condition: assigned_condition,
+          condition_number: conditionNumber,
+          phase: "reverse_recall",
+          test_order: index + 1,
+          word_type: stim.type,
+          cue_japanese: stim.japanese,
+          correct_spanish: stim.spanish,
+          response: response,
+          correct: correct,
+          end_reason: "timeout",
+          total_time_ms: totalTimeMs
+        };
+      });
+
+      jsPsych.finishTrial({
+        phase: "reverse_recall_summary",
+        reverse_recall_results: JSON.stringify(results),
+        reverse_recall_end_reason: "timeout",
+        reverse_recall_total_time_ms: totalTimeMs
+      });
+    }
+  }
+});
+
+// --- 全画面終了 ---
+  timeline.push({
+    type: jsPsychFullscreen,
+    fullscreen_mode: false,
+    delay_after: 0
+  });
+
+  // --- 終了画面  ★★★ 修正箇所 ★★★ ---
+  timeline.push({
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `
+    <p>課題は終了です。</p>
+    <p>「送信」を押すと，データを送信します。送信が完了するまで画面を閉じないでください。</p>
+  `,
+  choices: ['送信']
+});
+
+timeline.push({
+  type: jsPsychPipe,
+  action: "save",
+  experiment_id: expID,
+  filename: filename,
+  data_string: makeReverseRecallLongCSV,
+  wait_message: "<p>データを送信しています。画面を閉じないでください。</p>"
+});
+
+timeline.push({
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `
+    <p>データの送信が完了しました。</p>
+    <p>ご協力ありがとうございました。この画面を閉じてください。</p>
+  `,
+  choices: []
+});
+
+  // --- 実験開始 ---
+  jsPsych.run(timeline);
+}
+
+createExperiment();
+
+</script>
+</html>
