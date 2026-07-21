@@ -72,6 +72,7 @@
   const expID = "OaWsYD0moEXZ";
   const participantID = jsPsych.randomization.randomID(12);
   const filename = `paired_associate_${participantID}_${Date.now()}.csv`;
+  let reverseRecallResults = null;
 
   // --- 刺激リスト ---
   const high_association_words = [
@@ -118,16 +119,6 @@ function csvEscape(value) {
 }
 
 function makeReverseRecallLongCSV() {
-  const reverseTrials = jsPsych.data.get()
-    .filter({ phase: "reverse_recall_summary" })
-    .values();
-
-  if (reverseTrials.length === 0 || !reverseTrials[0].reverse_recall_results) {
-    return "\ufefferror,message\nNO_REVERSE_RECALL_DATA,reverse_recall_summary was not found\n";
-  }
-
-  const results = JSON.parse(reverseTrials[0].reverse_recall_results);
-
   const headers = [
     "participant_id",
     "study",
@@ -144,7 +135,14 @@ function makeReverseRecallLongCSV() {
     "total_time_ms"
   ];
 
-  const lines = results.map(row => {
+  if (!Array.isArray(reverseRecallResults) || reverseRecallResults.length === 0) {
+    console.error("reverseRecallResults が見つかりません。");
+    console.log("jsPsych data:", jsPsych.data.get().values());
+
+    return "\ufefferror,message\nNO_REVERSE_RECALL_DATA,reverseRecallResults was not found\n";
+  }
+
+  const lines = reverseRecallResults.map(row => {
     return headers.map(h => csvEscape(row[h])).join(",");
   });
 
@@ -649,6 +647,9 @@ timeline.push({
           total_time_ms: totalTimeMs
         };
       });
+
+      reverseRecallResults = results;
+      console.log("逆方向再生テスト結果:", reverseRecallResults);
 
       jsPsych.finishTrial({
         phase: "reverse_recall_summary",
