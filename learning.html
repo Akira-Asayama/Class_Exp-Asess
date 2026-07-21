@@ -482,8 +482,7 @@ timeline.push({
       </p>
 
       <p>
-        全20語が一度に表示されます。どの順番で回答してもかまいません。
-        分かるものから自由に回答してください。
+        どの順番で回答してもかまいません。分かるものから自由に回答してください。
       </p>
 
       <p>
@@ -683,7 +682,7 @@ timeline.push({
   action: "save",
   experiment_id: expID,
   filename: filename,
-  data_string: makeReverseRecallLongCSV,
+  data_string: () => makeReverseRecallLongCSV(),
   wait_message: "<p>データを送信しています。画面を閉じないでください。</p>"
 });
 
