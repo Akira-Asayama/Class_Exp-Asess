@@ -71,7 +71,7 @@
 
   const expID = "OaWsYD0moEXZ";
   const participantID = jsPsych.randomization.randomID(12);
-  const filename = `paired_associate_${participantID}.csv`;
+  const filename = `paired_associate_${participantID}_${Date.now()}.csv`;
 
   // --- 刺激リスト ---
   const high_association_words = [
@@ -683,7 +683,8 @@ timeline.push({
   experiment_id: expID,
   filename: filename,
   data_string: () => makeReverseRecallLongCSV(),
-  wait_message: "<p>データを送信しています。画面を閉じないでください。</p>"
+  wait_message: "<p>データを送信しています。画面を閉じないでください。</p>",
+  compression: false
 });
 
 timeline.push({
