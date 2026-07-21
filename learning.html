@@ -173,7 +173,7 @@ function makeReverseRecallLongCSV() {
       <div class='instruction-text'>
         <h2 style="text-align: center;">実験への参加について</h2>
         <p>この実験への参加は授業の一環です。</p>
-        <p>記憶ステップ，再生ステップ，各ブロックの間では，必要に応じて休憩をとることができます。</p>
+        <p>各ブロックの間では，必要に応じて休憩をとることができます。</p>
         <p>授業時間中に実験に参加することが難しい場合には，その場での参加を中止または中断し，後日参加することも可能です。</p>
         <p>実験の参加に同意していただける場合には，「次へ」を押してください。</p>
       </div>
@@ -239,10 +239,8 @@ function makeReverseRecallLongCSV() {
   timeline.push(instruction_group);
 
   // --- 記憶ステップ全体の設定 ---
-  const learning_duration_limit_ms = 3 * 60 * 1000; 
-  let learning_block_timeout = null; 
-  let is_first_trial_in_this_learning_block; 
-  let time_is_up_flag = false; 
+const learning_duration_limit_ms = 3 * 60 * 1000;
+let learning_block_start_time = null;
 
   // --- ③ 習得試行（学習試行＋テスト試行）x 3回 ---
   const num_acquisition_blocks = 3;
@@ -263,8 +261,7 @@ function makeReverseRecallLongCSV() {
         choices: ['次へ'], 
         post_trial_gap: 250,
         on_finish: function() {
-            is_first_trial_in_this_learning_block = true;
-            time_is_up_flag = false;
+          learning_block_start_time = performance.now();
         }
     };
     timeline.push(acquisition_block_intro);
@@ -330,18 +327,14 @@ function makeReverseRecallLongCSV() {
           },
           choices: ['次へ'],
           button_html: '<button class="jspsych-btn">%choice%</button>',
-          on_load: function() {
-            if (is_first_trial_in_this_learning_block) {
-              if (learning_block_timeout) { clearTimeout(learning_block_timeout); }
-              learning_block_timeout = setTimeout(function() {
-                time_is_up_flag = true; 
-                jsPsych.finishTrial(); 
-              }, learning_duration_limit_ms);
-              is_first_trial_in_this_learning_block = false; 
-            }
+          trial_duration: function() {
+            const elapsed = performance.now() - learning_block_start_time;
+            const remaining = learning_duration_limit_ms - elapsed;
+            return Math.max(1, remaining);
           },
           on_finish: function() {
-            if (time_is_up_flag) {
+            const elapsed = performance.now() - learning_block_start_time;
+            if (elapsed >= learning_duration_limit_ms) {
               jsPsych.endCurrentTimeline();
             }
           }
@@ -349,13 +342,6 @@ function makeReverseRecallLongCSV() {
       ],
       timeline_variables: current_block_learning_stimuli, 
       repetitions: 100, 
-      on_timeline_finish: function() {
-        if (learning_block_timeout) {
-            clearTimeout(learning_block_timeout);
-            learning_block_timeout = null;
-        }
-        time_is_up_flag = false; 
-      }
     };
     timeline.push(learning_trials_block);
 
